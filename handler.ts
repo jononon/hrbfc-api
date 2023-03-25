@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import footballApi from "./adapters/football-api";
 import { DynamoDBClient, PutItemCommand, GetItemCommand, ArchivalSummaryFilterSensitiveLog } from "@aws-sdk/client-dynamodb";
-import { Fixture } from "./adapters/football-api/types";
+import { Fixture, Response, FixturesResponse } from "./adapters/football-api/types";
 
 const team_id = 4680;
 
@@ -41,7 +41,10 @@ const update = async () => {
     dataExpiryTime = new Date(new Date().getTime() + minute);
   } else if (nextGame) {
     const nextGameDate = new Date(nextGame.date);
-    if (nextGameDate < dataExpiryTime) {
+    //if next game was scheduled to start but has not yet started, set expiry to 1 minute
+    if(nextGameDate < new Date()) {
+      dataExpiryTime = new Date(new Date().getTime() + minute);
+    } else if (nextGameDate < dataExpiryTime) {
       dataExpiryTime = nextGameDate;
     }
   }
@@ -105,17 +108,17 @@ export const getCurrentOrNextGame = async (
 
   const cacheEntry = await client.send(command) as any
 
-  let fixtures;
+  let fixtures: FixturesResponse;
 
-  if (cacheEntry.Item) {
+  if (cacheEntry.Item && new Date(cacheEntry.Item.data_expiry_time.S) > new Date()) {
     fixtures = JSON.parse(cacheEntry.Item.data.S);
   } else {
     fixtures = await update();
   }
 
-  let lastGame: any | null = null;
-  let nextGame: any | null = null;
-  let currentGame: any | null = null;
+  let lastGame: Response | null = null;
+  let nextGame: Response | null = null;
+  let currentGame: Response | null = null;
 
   let fixtureList = fixtures.response.sort((a, b) => new Date(a.fixture.date).getTime() - new Date(b.fixture.date).getTime());
 
@@ -141,7 +144,7 @@ export const getCurrentOrNextGame = async (
     gameToReturn = currentGame;
   } else if (lastGame && 
       nextGame &&
-      Math.abs(new Date(lastGame.date).getTime() - currentTime) < Math.abs(new Date(nextGame.date).getTime() - currentTime) ) {
+      Math.abs(new Date(lastGame.fixture.date).getTime() - currentTime) < Math.abs(new Date(nextGame.fixture.date).getTime() - currentTime) ) {
     gameToReturn = lastGame;
   } else {
     gameToReturn = nextGame;
@@ -185,6 +188,8 @@ export const getLatest = async (
     fixtures = await update();
   }
 
+  let fixtureList = fixtures.response.sort((a, b) => new Date(a.fixture.date).getTime() - new Date(b.fixture.date).getTime());
+
   const dataExpiryTime = new Date(cacheEntry.Item.data_expiry_time.S);
 
   if (dataExpiryTime < new Date()) {
@@ -196,7 +201,7 @@ export const getLatest = async (
     statusCode: 200,
     body: JSON.stringify(
       {
-        message: fixtures,
+        message: fixtureList,
         input: event,
       },
     ),
