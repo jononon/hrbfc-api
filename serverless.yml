@@ -1,0 +1,89 @@
+org: jonathandamico
+app: hrbfc-api
+service: hrbfc-api
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  stackTags:
+    project: "hrbfc-api"
+
+functions:
+  updateCache:
+    handler: handler.updateCache
+    events:
+      - httpApi:
+          path: /updateCache
+          method: get
+    environment:
+      API_FOOTBALL_KEY: ${ssm:/hrbfc-api/api-football-key}
+      CACHED_TABLE_NAME:
+        Ref: cachedDataTable
+    
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+        Resource:
+          - Fn::GetAtt: [cachedDataTable, Arn]
+
+  getLatest:
+    handler: handler.getLatest
+    events:
+      - httpApi:
+          path: /getLatest
+          method: get
+    environment:
+      API_FOOTBALL_KEY: ${ssm:/hrbfc-api/api-football-key}
+      CACHED_TABLE_NAME:
+        Ref: cachedDataTable
+    
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+        Resource:
+          - Fn::GetAtt: [cachedDataTable, Arn]
+  
+  getCurrentOrNextGame:
+    handler: handler.getCurrentOrNextGame
+    events:
+      - httpApi:
+          path: /getCurrentOrNextGame
+          method: get
+    environment:
+      API_FOOTBALL_KEY: ${ssm:/hrbfc-api/api-football-key}
+      CACHED_TABLE_NAME:
+        Ref: cachedDataTable
+    
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+        Resource:
+          - Fn::GetAtt: [cachedDataTable, Arn]
+
+resources: # CloudFormation template syntax from here on.
+    Resources:
+      cachedDataTable:
+        Type: AWS::DynamoDB::Table
+        Properties:
+          TableName: hrbfc-cached-data-table
+          AttributeDefinitions:
+            - AttributeName: key
+              AttributeType: S
+          KeySchema:
+            - AttributeName: key
+              KeyType: HASH
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-plugin-resource-tagging
+  - serverless-iam-roles-per-function
