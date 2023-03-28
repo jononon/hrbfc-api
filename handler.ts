@@ -25,6 +25,7 @@ const update = async () => {
 
     if (item.fixture.status.short === "NS") {
       nextGame = item.fixture;
+      break;
     }
 
     if ([ "1H", "2H", "HT", "ET", "BT", "P", "INT", "LIVE" ].includes(item.fixture.status.short)) {
