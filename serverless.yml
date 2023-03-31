@@ -71,7 +71,7 @@ functions:
     handler: handler.getTeamNames
     events:
       - httpApi:
-          path: /getCurrentOrNextGame
+          path: /getTeamNames
           method: get
     environment:
       API_FOOTBALL_KEY: ${ssm:/hrbfc-api/api-football-key}
