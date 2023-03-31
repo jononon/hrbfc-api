@@ -1,5 +1,6 @@
 import got from 'got';
-import { FixturesResponse } from "./types";
+import { FixturesResponse } from "./fixturesResponseTypes";
+import { TeamsResponse } from './teamsResponseTypes';
 
 const season = 2022;
 const teamId = 4680;
@@ -23,4 +24,19 @@ const getFixtures = async () => {
     return response
 }
 
-export default { getFixtures }
+const getTeams = async (leagueId: number) => {
+    const response = await httpClient.get('teams', {
+        headers: {
+        'x-rapidapi-key': process.env.API_FOOTBALL_KEY,
+        'x-rapidapi-host': 'api-football-v1.p.rapidapi.com',
+        },
+        searchParams: {
+            league: leagueId,
+            season: season,
+        },
+    }).json<TeamsResponse>();
+
+    return response
+}
+
+export default { getFixtures, getTeams }

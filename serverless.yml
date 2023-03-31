@@ -67,6 +67,25 @@ functions:
         Resource:
           - Fn::GetAtt: [cachedDataTable, Arn]
 
+  getTeamNames:
+    handler: handler.getTeamNames
+    events:
+      - httpApi:
+          path: /getCurrentOrNextGame
+          method: get
+    environment:
+      API_FOOTBALL_KEY: ${ssm:/hrbfc-api/api-football-key}
+      CACHED_TABLE_NAME:
+        Ref: cachedDataTable
+    
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+        Resource:
+          - Fn::GetAtt: [cachedDataTable, Arn]
+
 resources: # CloudFormation template syntax from here on.
     Resources:
       cachedDataTable:

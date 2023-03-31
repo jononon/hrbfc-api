@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import footballApi from "./adapters/football-api";
 import { DynamoDBClient, PutItemCommand, GetItemCommand, ArchivalSummaryFilterSensitiveLog } from "@aws-sdk/client-dynamodb";
-import { Fixture, Response, FixturesResponse } from "./adapters/football-api/types";
+import { Fixture, Response, FixturesResponse } from "./adapters/football-api/fixturesResponseTypes";
 
 const team_id = 4680;
 
@@ -74,27 +74,7 @@ const update = async () => {
   return data
 }
 
-export const updateCache = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-
-  const data = await update();
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify(
-      {
-        message: data,
-        input: event,
-      },
-    ),
-  };
-};
-
-export const getCurrentOrNextGame = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-
+const getLatestFixtures = async () => {
   const cacheTableName = process.env.CACHED_TABLE_NAME;
 
   const client = new DynamoDBClient({ region: "us-east-1" });
@@ -116,6 +96,105 @@ export const getCurrentOrNextGame = async (
   } else {
     fixtures = await update();
   }
+
+  return fixtures;
+}
+
+export const getTeamNames = async (
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> => {
+  const cacheTableName = process.env.CACHED_TABLE_NAME;
+
+  const client = new DynamoDBClient({ region: "us-east-1" });
+  const command = new GetItemCommand({
+    TableName: cacheTableName,
+    Key: {
+      "key": {
+        S: "teamNames"
+      }
+    }
+  });
+
+  const cacheEntry = await client.send(command) as any
+
+  let teamNames;
+  if (cacheEntry.Item && new Date(cacheEntry.Item.data_expiry_time.S) > new Date()) {
+    teamNames = JSON.parse(cacheEntry.Item.data.S);
+  } else {
+
+    const fixtures = await getLatestFixtures();
+    const leagueIds = [...new Set(fixtures.response.map((item) => item.league.id))];
+
+    teamNames = {};
+
+
+    for (const leagueId of leagueIds) {
+      const data = await footballApi.getTeams(leagueId);
+      
+      for (const item of data.response) {
+        teamNames[item.team.id] = {
+          "long": item.team.name,
+          "short": item.team.code
+        }
+      }
+    }
+
+    const command = new PutItemCommand({
+      TableName: cacheTableName,
+      Item: {
+        "key": {
+          S: "teamNames"
+        } ,
+        "data": {
+          S: JSON.stringify(teamNames)
+        },
+        "time_fetched": {
+          S: new Date().toISOString()
+        },
+        "data_expiry_time": {
+          S: new Date(new Date().getTime() + (1000 * 60 * 60 * 24)).toISOString()
+        }
+      }
+    });
+
+    await client.send(command);
+
+    return teamNames;
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(
+      {
+        message: teamNames,
+        input: event,
+      },
+    ),
+  };
+}
+
+export const updateCache = async (
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> => {
+
+  const data = await update();
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify(
+      {
+        message: data,
+        input: event,
+      },
+    ),
+  };
+};
+
+export const getCurrentOrNextGame = async (
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> => {
+
+  const fixtures = await getLatestFixtures();
 
   let lastGame: Response | null = null;
   let nextGame: Response | null = null;
