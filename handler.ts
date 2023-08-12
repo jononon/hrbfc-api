@@ -123,14 +123,17 @@ export const getTeamNames = async (
   } else {
 
     const fixtures = await getLatestFixtures();
-    const leagueIds = [...new Set(fixtures.response.map((item) => item.league.id))];
+    const leagueIds = Array.from(new Set(fixtures.response.map((item) => item.league.id)).values());
+
+    console.log(leagueIds)
 
     teamNames = {};
 
-
-    for (const leagueId of leagueIds) {
+    for (let leagueId of leagueIds) {
       const data = await footballApi.getTeams(leagueId);
       
+      console.log(data);
+
       for (const item of data.response) {
         teamNames[item.team.id] = {
           "long": item.team.name,
@@ -138,6 +141,8 @@ export const getTeamNames = async (
         }
       }
     }
+
+    console.log(teamNames)
 
     const command = new PutItemCommand({
       TableName: cacheTableName,
@@ -158,8 +163,6 @@ export const getTeamNames = async (
     });
 
     await client.send(command);
-
-    return teamNames;
   }
 
   return {

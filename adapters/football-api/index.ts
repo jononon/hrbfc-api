@@ -2,7 +2,7 @@ import got from 'got';
 import { FixturesResponse } from "./fixturesResponseTypes";
 import { TeamsResponse } from './teamsResponseTypes';
 
-const season = 2022;
+const season = 2023;
 const teamId = 4680;
 
 const httpClient = got.extend({
